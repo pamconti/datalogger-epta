@@ -1,164 +1,172 @@
 # Datalogger Ambiental e Inercial com STM32F411
 
-Projeto desenvolvido para o **Desafio do Processo Seletivo Payload** da **EPTA – Equipe de Propulsão e Tecnologia Aeroespacial (UFU)**.
+Projeto desenvolvido para o desafio do processo seletivo da Payload, da EPTA (Equipe de Propulsão e Tecnologia Aeroespacial da UFU).
 
-Datalogger para payload de foguete que registra, durante todo o voo, as condições do ambiente (temperatura, umidade e pressão) e o movimento do veículo (aceleração e velocidade angular), gravando os dados em um cartão microSD no formato CSV.
+Trata-se de uma placa embarcada no payload de um foguete, responsável por registrar o voo inteiro: temperatura, umidade e pressão do ambiente, além da aceleração e da velocidade angular do veículo. Os dados são gravados em um cartão microSD, em arquivos CSV, para análise posterior.
 
-> **Status:** em desenvolvimento.
-> - [x] Configuração do microcontrolador (STM32CubeMX): pinagem, clock, periféricos, FatFs e RTC
-> - [x] Projeto base compilando no STM32CubeIDE (0 erros, 0 warnings)
-> - [ ] Esquemático (KiCad)
-> - [ ] Layout da PCB (KiCad)
-> - [ ] Firmware: drivers, gravação em CSV e tratamento de erros
-> - [ ] Validação em Black Pill
+## Status do projeto
 
----
+O projeto está em andamento.
 
-## Sumário
+- [x] Configuração do microcontrolador no STM32CubeMX (pinagem, clock, periféricos, FatFs e RTC)
+- [x] Projeto base compilando no STM32CubeIDE, sem erros e sem warnings
+- [ ] Esquemático no KiCad
+- [ ] Layout da PCB no KiCad
+- [ ] Firmware (drivers dos sensores, gravação do CSV e tratamento de erros)
+- [ ] Testes da lógica do firmware no computador
 
-1. [Visão geral do hardware](#visão-geral-do-hardware)
-2. [Pinagem](#pinagem)
-3. [Configuração de clock](#configuração-de-clock)
-4. [Estrutura do repositório](#estrutura-do-repositório)
-5. [Como compilar e gravar](#como-compilar-e-gravar)
-6. [Validação](#validação)
-7. [Decisões de projeto](#decisões-de-projeto)
-8. [Referências](#referências)
-
----
-
-## Visão geral do hardware
+## Componentes principais
 
 | Bloco | Componente | Interface |
-|---|---|---|
-| Microcontrolador | STM32F411CEU6 (UFQFPN48) | — |
-| Temperatura / umidade / pressão | BME280 | I²C |
-| IMU (acelerômetro + giroscópio) | LSM6DSO | SPI + pino de interrupção (INT1) |
-| Armazenamento | Slot microSD | SDIO 4 bits |
-| Alimentação | USB-C + LDO 3,3 V | — |
-| Gravação e depuração | Conector SWD | SWDIO / SWCLK |
+| Microcontrolador | STM32F411CEU6 (UFQFPN48) | Não se aplica |
+| Temperatura, umidade e pressão | BME280 | I²C |
+| IMU (acelerômetro e giroscópio) | LSM6DSO | SPI, com pino de interrupção |
+| Armazenamento | Slot microSD | SDIO de 4 bits |
+| Alimentação | USB-C com regulador de 3,3 V | Não se aplica |
+| Gravação e depuração | Conector SWD | SWDIO e SWCLK |
 | Interface com o usuário | LED de status e botão | GPIO |
-
----
 
 ## Pinagem
 
-Pinagem definida e validada no STM32CubeMX (arquivo [`firmware/firmware.ioc`](firmware/firmware.ioc)). A pinagem de LED, botão, cristais, USB e SWD foi escolhida para coincidir com a da placa **WeAct Black Pill (STM32F411CEU6)**, permitindo que o mesmo firmware rode na placa projetada e na Black Pill usada para validação.
+A pinagem foi definida no STM32CubeMX, e a configuração completa está no arquivo [`firmware/firmware.ioc`](firmware/firmware.ioc).
 
-| Função | Sinal | Pino |
-|---|---|---|
-| **SDIO (microSD)** | CK | PB15 |
-| | CMD | PA6 |
-| | D0 | PB7 |
-| | D1 | PA8 |
-| | D2 | PA9 |
-| | D3 | PB5 |
-| | Detecção de cartão (`SD_DETECT`) | PB1 (entrada com pull-up) |
-| **SPI1 (IMU)** | SCK | PA5 |
-| | MOSI | PA7 |
-| | MISO | PB4 |
-| | CS (`IMU_CS`) | PA4 |
-| | INT1 (`IMU_INT1`) | PB0 (EXTI0, borda de subida) |
-| **I2C1 (BME280)** | SCL | PB8 |
-| | SDA | PB9 |
-| **USB (CDC)** | D− | PA11 |
-| | D+ | PA12 |
-| **USART2 (debug)** | TX | PA2 |
-| | RX | PA3 |
-| **SWD** | SWDIO | PA13 |
-| | SWCLK | PA14 |
-| **Cristais** | HSE 25 MHz | PH0 / PH1 |
-| | LSE 32,768 kHz | PC14 / PC15 |
-| **Interface** | LED de status (`LED_STATUS`) | PC13 |
-| | Botão (`BTN_USER`) | PA0 (entrada com pull-up) |
+Os pinos do LED, do botão, dos cristais, do USB e do SWD seguem a mesma disposição da placa WeAct Black Pill, que usa o mesmo microcontrolador. Com isso, o mesmo firmware pode ser validado futuramente em uma Black Pill e rodar na placa projetada sem nenhuma alteração.
 
----
+### Cartão microSD (SDIO de 4 bits)
 
-## Configuração de clock
+| Sinal | Pino | Observação |
+| CK | PB15 | Clock do cartão |
+| CMD | PA6 | Comandos |
+| D0 | PB7 | Dados |
+| D1 | PA8 | Dados |
+| D2 | PA9 | Dados |
+| D3 | PB5 | Dados |
+| SD_DETECT | PB1 | Detecção de cartão, entrada com pull-up |
+
+### IMU LSM6DSO (SPI1)
+
+| Sinal | Pino | Observação |
+| SCK | PA5 | Clock do SPI |
+| MOSI | PA7 | Dados do microcontrolador para o sensor |
+| MISO | PB4 | Dados do sensor para o microcontrolador |
+| IMU_CS | PA4 | Seleção do sensor, controlada por software |
+| IMU_INT1 | PB0 | Interrupção de dado pronto, borda de subida |
+
+### Sensor BME280 (I2C1)
+
+| Sinal | Pino |
+| SCL | PB8 |
+| SDA | PB9 |
+
+### USB
+
+| Sinal | Pino |
+| D- | PA11 |
+| D+ | PA12 |
+
+### Gravação e depuração
+
+| Interface | Sinal | Pino |
+| SWD | SWDIO | PA13 |
+| SWD | SWCLK | PA14 |
+| USART2 | TX | PA2 |
+| USART2 | RX | PA3 |
+
+### Cristais
+
+| Cristal | Uso | Pinos |
+| 25 MHz | Clock principal (HSE) | PH0 e PH1 |
+| 32,768 kHz | Relógio de tempo real (LSE) | PC14 e PC15 |
+
+### LED e botão
+
+| Função | Pino | Observação |
+| LED_STATUS | PC13 | Mesmo pino do LED da Black Pill |
+| BTN_USER | PA0 | Entrada com pull-up, mesmo pino do botão da Black Pill |
+
+## Clock
+
+O clock do sistema vem do cristal externo de 25 MHz, passando pelo PLL.
 
 | Parâmetro | Valor |
-|---|---|
-| Fonte do PLL | HSE (cristal de 25 MHz) |
-| PLL | M = 25, N = 192, P = 2, Q = 4 |
-| SYSCLK / HCLK | 96 MHz |
-| APB1 (PCLK1) | 48 MHz |
-| APB2 (PCLK2) | 96 MHz |
-| Clock de 48 MHz (USB e SDIO) | 48 MHz |
-| RTC | LSE (cristal de 32,768 kHz) |
+| Fonte do PLL | HSE, cristal de 25 MHz |
+| Divisores do PLL | M = 25, N = 192, P = 2, Q = 4 |
+| Clock do sistema (HCLK) | 96 MHz |
+| Barramento APB1 | 48 MHz |
+| Barramento APB2 | 96 MHz |
+| Clock do USB e do SDIO | 48 MHz |
+| RTC | LSE, cristal de 32,768 kHz |
 
-O HCLK foi definido em 96 MHz, e não no máximo de 100 MHz, porque é a frequência que permite gerar exatamente 48 MHz para o USB e o SDIO a partir do mesmo PLL.
+O sistema opera em 96 MHz, e não no máximo de 100 MHz, porque o USB e o SDIO precisam de exatamente 48 MHz. Com um cristal de 25 MHz, 96 MHz é a frequência que permite obter esses 48 MHz exatos a partir do mesmo PLL.
 
-**Periféricos auxiliares:**
-- **TIM2:** prescaler 95 → contagem de 1 µs; período de 2³² − 1 (estoura a cada ~71 min). Usado como base de tempo de alta resolução para os timestamps.
-- **RTC:** calendário alimentado pelo LSE, para timestamps absolutos.
-- **FatFs:** modo SD Card sobre SDIO com DMA (RX e TX), nomes longos habilitados (LFN), setor de 512 bytes.
+Outras configurações:
 
----
+- **TIM2**: conta de 1 em 1 µs (prescaler de 95). Por ser de 32 bits, só reinicia a contagem depois de cerca de 71 minutos, tempo muito maior que a duração de um voo. É usado nos timestamps de alta resolução.
+- **RTC**: alimentado pelo cristal de 32,768 kHz, para registrar data e hora reais em cada leitura.
+- **FatFs**: sobre o SDIO com DMA, com suporte a nomes longos de arquivo.
 
-## Estrutura do repositório
+## Organização do repositório
 
-```
-├── hardware/   Projeto do KiCad, Gerbers, BOM, arquivo de posicionamento e PDF do esquemático
-├── firmware/   Projeto do STM32CubeIDE (gerado pelo STM32CubeMX)
-├── docs/       Decisões de projeto, diagrama de blocos, testes e datasheets
-├── scripts/    Scripts em Python para análise dos arquivos CSV
-└── README.md
-```
+| Pasta | Conteúdo |
+| `hardware/` | Projeto do KiCad, Gerbers, BOM, arquivo de posicionamento e PDF do esquemático |
+| `firmware/` | Projeto do STM32CubeIDE, gerado pelo STM32CubeMX |
+| `docs/` | Decisões de projeto, diagrama de blocos, testes e datasheets |
+| `scripts/` | Scripts em Python para análise dos CSVs |
 
----
+## Como compilar e gravar o firmware
 
-## Como compilar e gravar
+São necessários o [STM32CubeIDE](https://www.st.com/stm32cubeide) e um gravador ST-Link V2. O [STM32CubeMX](https://www.st.com/stm32cubemx) só é necessário para alterar a configuração do microcontrolador.
 
-### Requisitos
-- [STM32CubeMX](https://www.st.com/stm32cubemx) 6.x (apenas para alterar a configuração do microcontrolador)
-- [STM32CubeIDE](https://www.st.com/stm32cubeide)
-- Gravador ST-Link V2
+Para compilar:
 
-### Compilar
-1. Clone este repositório.
-2. No STM32CubeIDE: **File → Import → STM32 → STM32CubeMX/STM32CubeIDE Project**.
-3. Em *Import source*, selecione a pasta `firmware/` e clique em **Finish**.
-4. Selecione o projeto e compile com **Ctrl+B**.
+1. Clonar este repositório.
+2. No STM32CubeIDE, abrir **File > Import > STM32 > STM32CubeMX/STM32CubeIDE Project**.
+3. Selecionar a pasta `firmware` e clicar em **Finish**.
+4. Selecionar o projeto e compilar com **Ctrl+B**.
 
-### Gravar
-1. Conecte o ST-Link ao conector SWD (SWDIO, SWCLK, GND, 3V3 e NRST).
-2. No STM32CubeIDE, clique em **Run** (gravar) ou **Debug** (gravar e depurar).
+Para gravar, basta ligar o ST-Link ao conector SWD (SWDIO, SWCLK, GND, 3V3 e NRST) e clicar em **Run** no STM32CubeIDE. Para depurar, usar **Debug**.
 
-### Alterar a configuração do microcontrolador
-Abra `firmware/firmware.ioc` no STM32CubeMX, faça a alteração e clique em **GENERATE CODE**. O código escrito dentro dos blocos `USER CODE BEGIN` / `USER CODE END` é preservado.
+Para alterar algum pino ou periférico, abrir o `firmware/firmware.ioc` no STM32CubeMX, fazer a alteração e clicar em **GENERATE CODE**. O código escrito dentro dos blocos `USER CODE BEGIN` e `USER CODE END` é preservado.
 
----
+## Testes
 
-## Validação
+A placa não foi montada fisicamente, e não houve hardware disponível (placa de desenvolvimento ou módulos) para validar o firmware dentro do prazo do desafio.
 
-Hardware disponível para validação: **WeAct Black Pill (STM32F411CEU6)** e **ST-Link V2**. Os módulos dos sensores e do microSD não estavam disponíveis.
+Por isso, a validação foi feita em duas frentes:
 
-| Etapa | Método | Resultado |
-|---|---|---|
-| Compilação | STM32CubeIDE | ✅ 0 erros, 0 warnings |
-| Gravação via SWD | Black Pill + ST-Link | ⏳ pendente |
-| Blink do LED de status | Black Pill | ⏳ pendente |
-| Clock (HSE + PLL a 96 MHz) | Black Pill | ⏳ pendente |
-| Tratamento de erro: falha de sensor | Black Pill sem sensores | ⏳ pendente |
-| Tratamento de erro: cartão ausente | Black Pill sem cartão | ⏳ pendente |
-| Leitura do BME280 | — | ⚠️ sem módulo disponível |
-| WHO_AM_I do IMU | — | ⚠️ sem módulo disponível |
-| Gravação de CSV no SD | — | ⚠️ sem módulo disponível |
+- **Compilação** do firmware completo no STM32CubeIDE.
+- **Testes no computador** da parte do firmware que não depende de hardware: a compensação do BME280, conferida com os valores de exemplo do datasheet da Bosch; a conversão das leituras brutas do IMU para g e graus por segundo; e a formatação das linhas do CSV.
 
----
+| Teste | Método | Resultado |
+| Compilação | STM32CubeIDE | OK, sem erros e sem warnings |
+| Compensação do BME280 | Teste no computador | Pendente |
+| Conversão das leituras do IMU | Teste no computador | Pendente |
+| Formatação do CSV | Teste no computador | Pendente |
+| Testes em hardware | Não realizado | Sem hardware disponível |
+
+### Roteiro de validação em hardware
+
+Roteiro previsto para quando houver hardware disponível, seja a placa montada ou uma Black Pill com módulos em protoboard, na ordem sugerida pelo desafio:
+
+1. Medir a tensão de 3,3 V na saída do regulador.
+2. Gravar o firmware pelo SWD e verificar o LED de status piscando.
+3. Fazer uma varredura no barramento I²C e confirmar a resposta do BME280.
+4. Ler o registrador WHO_AM_I do LSM6DSO pelo SPI.
+5. Criar um arquivo no cartão microSD.
+6. Testar os erros tratados pelo firmware: sensor desconectado, cartão ausente e cartão cheio.
+7. Comparar as leituras do BME280 com um instrumento de referência.
+8. Verificar o IMU em repouso, esperando aceleração próxima de 1 g no eixo vertical.
 
 ## Decisões de projeto
 
-As justificativas de cada decisão, com as referências usadas, estão em [`docs/decisoes-de-projeto.md`](docs/decisoes-de-projeto.md).
-
----
+A justificativa de cada escolha, com as fontes consultadas, está no arquivo [`docs/decisoes-de-projeto.md`](docs/decisoes-de-projeto.md).
 
 ## Referências
 
-- STMicroelectronics. *STM32F411xC/E Datasheet* (DS10314).
-- STMicroelectronics. *AN4488 – Getting started with STM32F4xxxx MCU hardware development*.
-- STMicroelectronics. *UM1718 – STM32CubeMX for STM32 configuration and initialization C code generation*.
-- STMicroelectronics. *LSM6DSO Datasheet*.
-- Bosch Sensortec. *BME280 Datasheet*.
-- WeAct Studio. *MiniF4 (Black Pill) – STM32F4x1*. https://github.com/WeActTC/MiniF4-STM32F4x1
-- EPTA – UFU. *Desafio de Processo Seletivo Payload*, 11 de outubro de 2026.
+- STMicroelectronics. STM32F411xC/E Datasheet (DS10314).
+- STMicroelectronics. AN4488: Getting started with STM32F4xxxx MCU hardware development.
+- STMicroelectronics. UM1718: STM32CubeMX for STM32 configuration and initialization C code generation.
+- STMicroelectronics. LSM6DSO Datasheet.
+- Bosch Sensortec. BME280 Datasheet.
+- WeAct Studio. MiniF4 (Black Pill), STM32F4x1. https://github.com/WeActTC/MiniF4-STM32F4x1
+- EPTA, UFU. Desafio de Processo Seletivo Payload, 11 de outubro de 2026.
